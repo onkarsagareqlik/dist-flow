@@ -1,11 +1,13 @@
-import { setValue, getValue } from 'qlik-chart-modules';
+import { setValue, getValue, fontResolver as createFontResolver } from 'qlik-chart-modules';
 import sortOrderBuilder from '@qlik/common/extra/sort-order/sort-order';
+import ChartStyleComponent, { getChartFontResolver } from '@qlik/common/extra/chart-style-component';
 import settingsRetriever from './sorting/boxplot-sorting-settings-retriever';
 import elementsRetriever from './sorting/boxplot-sorting-elements-retriever';
 import boxplotUtils from './boxplot-utils';
 import propsLogic from './boxplot-properties-logic';
 import boxplotSorter from './sorting/boxplot-sorter';
 import ObjectUtils from './object-utils/object-utils';
+import getStylingPanelDefinition from './styling-panel-definition';
 
 const chartID = 'object.boxPlot';
 
@@ -19,6 +21,9 @@ const SORTING_REFS = {
 export default function propertyDefinition(env) {
   const { flags, translator } = env;
   const theme = env.anything.sense.theme;
+
+  const stylingPanelEnabled = flags.isEnabled('SENSECLIENT_IM_2019_STYLINGPANEL_BOXPLOT');
+  const bkgOptionsEnabled = flags.isEnabled('SENSECLIENT_IM_2019_BOXPLOT_BG');
 
   const lookupColorInPalette = (color) => {
     const palette = theme.getDataColorPickerPalettes()[0].colors;
@@ -230,11 +235,13 @@ export default function propertyDefinition(env) {
       },
     },
   };
-
+  const fontResolver = getChartFontResolver(theme, translator, chartID, createFontResolver, flags);
+  const styleOptions = ChartStyleComponent(fontResolver, theme, chartID);
   const presentation = {
     type: 'items',
     translation: 'properties.presentation',
     items: {
+      stylingPanel: stylingPanelEnabled && getStylingPanelDefinition(bkgOptionsEnabled, styleOptions),
       orientation: {
         ref: 'orientation',
         type: 'string',

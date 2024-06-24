@@ -1,7 +1,9 @@
 import extend from 'extend';
-import { getValue } from 'qlik-chart-modules';
+import { fontResolver as createFontResolver, getValue } from 'qlik-chart-modules';
 // import defaultProperties from '../../../assets/client/property-panel/default-properties';
+import ChartStyleComponent, { getChartFontResolver } from '@qlik/common/extra/chart-style-component';
 import waterfallUtils from './waterfallchart-utils';
+import getStylingPanelDefinition from './styling-panel-property-definiton';
 
 function colorIsNotAuto(data) {
   return !data.color.auto;
@@ -9,6 +11,9 @@ function colorIsNotAuto(data) {
 
 export default function propertyDefinition(env) {
   const { flags, translator } = env;
+  // feature flags
+  const stylingPanelEnabled = env.flags.isEnabled('SENSECLIENT_IM_2020_STYLINGPANEL_WATERFALLCHART');
+  const bkgOptionsEnabled = env.flags.isEnabled('SENSECLIENT_IM_2020_WATERFALLCHART_BG');
   const data = {
     uses: 'data',
     addTranslation: 'Properties.AddData',
@@ -70,11 +75,15 @@ export default function propertyDefinition(env) {
     },
   };
 
+  const theme = env.anything.sense.theme;
+  const fontResolver = getChartFontResolver(theme, translator, waterfallUtils.chartID, createFontResolver, flags);
+  const styleOptions = ChartStyleComponent(fontResolver, theme, waterfallUtils.chartID);
   const presentation = {
     type: 'items',
     translation: 'properties.presentation',
     grouped: true,
     items: {
+      stylingPanel: stylingPanelEnabled && getStylingPanelDefinition(bkgOptionsEnabled, styleOptions, flags),
       gridLines: {
         type: 'items',
         snapshot: {

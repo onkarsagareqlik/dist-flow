@@ -1,11 +1,13 @@
 import ChartView from '@qlik/common/picasso/chart-view';
 import ChartBuilder from '@qlik/common/picasso/chart-builder/chart-builder';
-import chartStyleUtils from '@qlik/common/extra/chart-style-utils';
+import Color from '@qlik/common/extra/color';
 import ScrollHandler from '@qlik/common/picasso/scroll/scroll-handler';
 import DependentInteractions from '@qlik/common/picasso/selections/dependent-interactions';
 import TooltipHandler from '@qlik/common/picasso/tooltip/tooltips-handler';
 import formatting from '@qlik/common/picasso/formatting';
 import stringUtil from '@qlik/common/extra/string-util';
+import { getAxisLabelStyle, getLegendLabelStyle, getValueLabelStyle } from '@qlik/common/extra/chart-style-component';
+import { themeService as createThemeService } from 'qlik-chart-modules';
 import CubeGenerator from './waterfallchart-cube-generator-by-measures';
 import waterfallUtils from './waterfallchart-utils';
 import tickGenerator from './waterfallchart-tick-generator';
@@ -18,7 +20,7 @@ const BAR_WIDTH_RATIO = 0.7;
 // Implementation details
 //
 
-function init({ picasso, environment, $element }) {
+function init({ picasso, environment, $element, flags }) {
   const backendApi = null;
   const selectionsApi = null;
   this._super(picasso, $element, environment, backendApi, selectionsApi);
@@ -31,6 +33,7 @@ function init({ picasso, environment, $element }) {
   );
   this._scrollHandler.setOptions({ direction: 'horizontal' });
   this.setDataPaths(['generated/qHyperCube']);
+  this.flags = flags;
 }
 
 function getSlicedData(top, height) {
@@ -145,26 +148,26 @@ function getBarSettings(tooltipSettings, layout) {
   };
 }
 
-function getInsideValueColor(boxColor, darkColor, lightColor) {
-  return chartStyleUtils.getBestContrast(boxColor, darkColor, lightColor);
-}
-
 function getLabel(context) {
   const measure = context.data.measure;
   const field = context.dataset(measure.source.key).field(measure.source.field);
   return formatting.formatMeasureValue(field, measure);
 }
 
-function getBarLabelSettings(theme) {
-  const outsideValueColor = theme.getStyle(chartID, 'value.color', 'default');
-  const darkColor = theme.getStyle(chartID, 'value.color', 'dark');
-  const lightColor = theme.getStyle(chartID, 'value.color', 'light');
+function getBarLabelSettings(themeService, layout) {
+  const styles = themeService.getStyles();
+  const valueLabelSettings = getValueLabelStyle(chartID, styles, layout);
+  const outsideValueColor = valueLabelSettings?.fill || styles.label.value.color;
+  const darkColor = styles.label.value.darkColor;
+  const lightColor = styles.label.value.lightColor;
+  const getContrastColor = () => (ctx) => (Color.isDark(ctx.node.attrs.fill) ? lightColor : darkColor);
   return {
     settings: {
       sources: [
         {
           strategy: {
             settings: {
+              ...valueLabelSettings,
               direction(context) {
                 return context.data && context.data.end.value > context.data.start.value ? 'up' : 'down';
               },
@@ -173,9 +176,7 @@ function getBarLabelSettings(theme) {
                   placements: [
                     { fill: outsideValueColor },
                     {
-                      fill(s) {
-                        return getInsideValueColor(s.data.boxColor.value, darkColor, lightColor);
-                      },
+                      fill: valueLabelSettings?.fill ? outsideValueColor : getContrastColor(),
                     },
                     {
                       position: 'opposite',
@@ -243,7 +244,7 @@ function getBridgeSettings(isRtl, theme) {
   };
 }
 
-function getLegendSettings(environment, layout) {
+function getLegendSettings(environment, layout, flags) {
   const { theme, translator } = environment;
   const positveColor = waterfallUtils.getColorForPositiveValue(layout, theme);
   const negativeColor = waterfallUtils.getColorForNegativeValue(layout, theme);
@@ -251,6 +252,8 @@ function getLegendSettings(environment, layout) {
   const positiveText = translator.get('waterfall.legend.positiveValue.label');
   const negativeText = translator.get('waterfall.legend.negativeValue.label');
   const subtotalText = translator.get('waterfall.legend.subtotal.label');
+  const labelStyleSettings = getLegendLabelStyle(chartID, theme, layout, flags);
+
   return {
     displayOrder: 200,
     minimumLayoutMode: 'MEDIUM',
@@ -261,6 +264,13 @@ function getLegendSettings(environment, layout) {
       range: [positveColor, negativeColor, subtotalColor],
     },
     style: {
+      item: {
+        label: {
+          fontSize: labelStyleSettings.fontSize,
+          fontFamily: labelStyleSettings.fontFamily,
+          fill: labelStyleSettings.color,
+        },
+      },
       title: {
         show: false,
       },
@@ -277,10 +287,10 @@ function createChartSettings(layout) {
     chartID,
     theme,
     isRtl,
+    flags: this.flags,
   });
   const width = this.picassoElement.clientWidth;
   const height = this.picassoElement.clientHeight;
-
   const tooltipSettings = {};
   tooltipSettings.box = this._tooltipHandler.setUp({
     chartBuilder,
@@ -364,13 +374,14 @@ function createChartSettings(layout) {
     refLines: layout.refLine && layout.refLine.refLines,
 
     brushActions: this._dependentActions.gestures,
+    axisLabelStyle: getAxisLabelStyle(chartID, theme, layout),
   });
 
   chartBuilder.addComponent('box-marker', getBarSettings(tooltipSettings, layout));
   chartBuilder.addComponent('point-marker', getBridgeSettings(isRtl, theme));
 
   if (!layout.legend || layout.legend.show) {
-    chartBuilder.addComponent('categorical-legend', getLegendSettings(this.environment, layout), {
+    chartBuilder.addComponent('categorical-legend', getLegendSettings(this.environment, layout, this.flags), {
       dock: layout.legend ? layout.legend.dock : 'auto',
       isRtl,
       chartWidth: width,
@@ -378,8 +389,14 @@ function createChartSettings(layout) {
     });
   }
 
+  const themeService = createThemeService({
+    theme,
+    config: {
+      id: 'waterfallChart',
+    },
+  });
   if (layout.dataPoint.showLabels) {
-    chartBuilder.addComponent('labels', getBarLabelSettings(theme));
+    chartBuilder.addComponent('labels', getBarLabelSettings(themeService, layout));
   }
 
   // Add snapshot settings

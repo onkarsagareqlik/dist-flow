@@ -1,6 +1,7 @@
-import { setValue, getValue } from 'qlik-chart-modules';
+import { fontResolver as createFontResolver, setValue, getValue } from 'qlik-chart-modules';
 import HyperCubeDefGenerator from '@qlik/common/picasso/hypercube-def-generator/hypercube-def-generator';
 import sortOrderBuilder from '@qlik/common/extra/sort-order/sort-order';
+import ChartStyleComponent, { getChartFontResolver } from '@qlik/common/extra/chart-style-component';
 import distplotUtils from './distributionplot-utils';
 import propsLogic from './distributionplot-properties-logic';
 import distplotSorter from './sorting/distributionplot-sorter';
@@ -8,6 +9,7 @@ import settingsRetriever from './sorting/distributionplot-sorting-settings-retri
 import elementsRetriever from './sorting/distributionplot-sorting-elements-retriever';
 import expressionSortOrderer from './sorting/distributionplot-expression-sort-orderer';
 import CONSTANTS from './distributionplot-constants';
+import getStylingPanelDefinition from './styling-panel-definition';
 
 function getNumMeasures(obj) {
   return getValue(obj, 'qHyperCubeDef.qMeasures.length', 0);
@@ -27,6 +29,10 @@ function persistentColorsShowFunc(data) {
 export default function propertyDefinition(env) {
   const { flags, translator } = env;
   const theme = env.anything.sense.theme;
+
+  // Feature Flags
+  const stylingPanelEnabled = env.flags.isEnabled('SENSECLIENT_IM_2018_STYLINGPANEL_DIST_PLOT');
+  const bkgOptionsEnabled = env.flags.isEnabled('SENSECLIENT_IM_2018_DIST_BG');
 
   const lookupColorInPalette = (color) => {
     const palette = theme.getDataColorPickerPalettes()[0].colors;
@@ -168,10 +174,13 @@ export default function propertyDefinition(env) {
       },
     },
   };
+  const fontResolver = getChartFontResolver(theme, translator, CONSTANTS.CHART_ID, createFontResolver, flags);
+  const styleOptions = ChartStyleComponent(fontResolver, theme, CONSTANTS.CHART_ID);
   const presentation = {
     type: 'items',
     translation: 'properties.presentation',
     items: {
+      stylingPanel: stylingPanelEnabled && getStylingPanelDefinition(bkgOptionsEnabled, styleOptions, flags),
       orientation: {
         ref: 'orientation',
         type: 'string',

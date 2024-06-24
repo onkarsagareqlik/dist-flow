@@ -1,6 +1,7 @@
-import { getValue } from 'qlik-chart-modules';
+import { getValue, themeService as createThemeService } from 'qlik-chart-modules';
 import ChartBuilder from '@qlik/common/picasso/chart-builder/chart-builder';
 import DependentInteractions from '@qlik/common/picasso/selections/dependent-interactions';
+import { getAxisLabelStyle, getAxisTitleStyle } from '@qlik/common/extra/chart-style-component';
 import DimensionAxis from './dimension-axis';
 import DimensionScale from './dimension-scale';
 import BoxMarker from './box-marker';
@@ -60,12 +61,18 @@ function createChartSettings(chartView, layout) {
   const orgDimInfo = getValue(layout, 'qHyperCube.qDimensionInfo.0', {});
   const dimTitle = orgDimInfo.qFallbackTitle || '';
   const { theme, translator } = chartView.environment;
-
   // Create components
   const chartBuilder = ChartBuilder.create({
     chartID,
     theme,
     isRtl,
+    flags: chartView.flags,
+  });
+  const themeService = createThemeService({
+    theme,
+    config: {
+      id: 'histogram',
+    },
   });
 
   let basicSelectionSettings = {};
@@ -198,6 +205,8 @@ function createChartSettings(chartView, layout) {
 
     // ref-lines
     refLines: layout.refLine && layout.refLine.refLines,
+    axisTitleStyle: getAxisTitleStyle(chartID, theme, layout),
+    axisLabelStyle: getAxisLabelStyle(chartID, theme, layout),
   });
 
   const settings = chartBuilder.getSettings();
@@ -214,7 +223,7 @@ function createChartSettings(chartView, layout) {
   chartBuilder.addComponent('box-marker', boxMarkerSettings);
 
   if (layout.dataPoint && layout.dataPoint.showLabels) {
-    const binLabelSettings = Label.createSettings(layout, theme);
+    const binLabelSettings = Label.createSettings(layout, themeService, chartID);
     chartBuilder.addComponent('labels', binLabelSettings);
   }
 

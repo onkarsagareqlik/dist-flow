@@ -5,7 +5,6 @@
 .cache/
 .DS_Store
 .idea/
-.vscode/
 .npmrc
 .gradle
 node_modules/
@@ -18,3 +17,10 @@ charts/boxplot/sn-boxplot-ext/
 charts/distributionplot/sn-distributionplot-ext/
 charts/histogram/sn-histogram-ext/
 charts/waterfallchart/sn-waterfall-ext/
+
+test-results
+test/rendering/reports
+test/rendering/suites/**/*local*.png
+test/rendering/**/*local*.png
+test/integration/**/**/*local*.png
+test/integration/reports

@@ -1,5 +1,6 @@
 import extend from 'extend';
 import axisDockUtil from './util/axis-dock-util';
+import getTextRenderer from './util/get-text-renderer';
 
 function axis(settings, options) {
   const chartID = options && options.chartID; // Should we validate if the parameter exists?
@@ -18,6 +19,7 @@ function axis(settings, options) {
   const defaultSettings = {
     key: 'axis',
     type: 'axis',
+    renderer: getTextRenderer(options.flags),
     dock: axisDockUtil.getAxisDock(direction, dock, isRtl),
     brush: { trigger: [], consume: [] },
     settings: {
@@ -48,7 +50,11 @@ function axis(settings, options) {
       },
     },
   };
-  return extend(true, {}, defaultSettings, settings || {});
+  const axisSettings = extend(true, {}, defaultSettings, settings || {});
+  axisSettings.brush.consume.forEach((consume) => {
+    consume.style.active.strokeWidth = 0;
+  });
+  return axisSettings;
 }
 
 function xAxis(settings, options) {

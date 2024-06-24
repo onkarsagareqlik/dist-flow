@@ -1,21 +1,31 @@
-import chartStyleUtils from '@qlik/common/extra/chart-style-utils';
+import { getValueLabelStyle } from '@qlik/common/extra/chart-style-component';
+import Color from '@qlik/common/extra/color';
 
 //
 // Implementation details
 //
 
-function createLabelSettings(layout, theme) {
-  const boxFillColor = theme.getColorPickerColor(layout.color.bar.paletteColor);
-
+function createLabelSettings(layout, themeService, chartId) {
+  const styles = themeService.getStyles();
+  const valueLabelSettings = getValueLabelStyle(chartId, styles, layout);
+  const boxFillColor = valueLabelSettings.fill || styles.label.value.color;
+  const getContrastColor = () => (ctx) =>
+    Color.isDark(ctx.node.attrs.fill) ? styles.label.value.lightColor : styles.label.value.darkColor;
   return {
     settings: {
       sources: [
         {
           strategy: {
             settings: {
+              ...valueLabelSettings,
               labels: [
                 {
-                  placements: [{}, { fill: chartStyleUtils.getInverse(boxFillColor) }],
+                  placements: [
+                    { fill: boxFillColor },
+                    {
+                      fill: valueLabelSettings.fill ? boxFillColor : getContrastColor(),
+                    },
+                  ],
                 },
               ],
             },

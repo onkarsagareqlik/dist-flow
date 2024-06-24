@@ -1,19 +1,34 @@
 version: 2.1
 
+orbs:
+  browser-tools: circleci/browser-tools@1.4.8
+
 executors:
   docker-node:
     docker:
       - image: qlik/node-build
     working_directory: ~/dist-flow-charts
   browser-node:
-    # Available images https://hub.docker.com/r/circleci/node/tags/
     docker:
-      - image: circleci/node:14.18.2-browsers
+      - image: cimg/node:22.2.0-browsers
+      - image: mcr.microsoft.com/playwright:focal
     working_directory: ~/dist-flow-charts
 
 commands:
+  install_pnpm:
+    steps:
+      - run:
+          name: Install pnpm package manager
+          command: |
+            if ! command -v pnpm &> /dev/null
+            then
+              corepack enable
+              corepack prepare pnpm@latest-8 --activate
+              pnpm config set store-dir ~/.pnpm-store
+            fi
   use_workspace:
     steps:
+      - install_pnpm
       - attach_workspace:
           at: ~/dist-flow-charts
   setup_write_access:
@@ -21,19 +36,47 @@ commands:
       - add_ssh_keys:
           fingerprints:
             - "d3:8b:35:a0:d4:6c:eb:76:68:1d:c1:48:27:7b:81:37"
+  run_playwright:
+    parameters:
+      command:
+        type: enum
+        enum:
+          - rendering
+          - integration
+    steps:
+      - use_workspace
+      - browser-tools/install-chrome
+      - browser-tools/install-chromedriver
+      - run:
+          name: Install Playwright
+          command: |
+            npx playwright install
+      - run:
+          name: Install Fonts
+          command: ./.circleci/install-fonts.sh
+      - run: pnpm run test:<<parameters.command>>
+      - store_test_results:
+          path: ./test/<<parameters.command>>/reports/xml/report.xml
+      - store_artifacts:
+          path: ./test-results/
+      - store_artifacts:
+          path: ./test/<<parameters.command>>/reports/html
 
 jobs:
   install:
     executor: docker-node
     steps:
       - checkout
+      - install_pnpm
       - restore_cache:
-          key: v2-yarn-deps-{{ checksum "yarn.lock" }}
-      - run: yarn install --frozen-lockfile
+          key: v1-pnpm-deps-{{ checksum "pnpm-lock.yaml" }}
+      - run:
+          name: Install Dependencies
+          command: pnpm install --frozen-lockfile
       - save_cache:
-          key: v2-yarn-deps-{{ checksum "yarn.lock" }}
+          key: v1-pnpm-deps-{{ checksum "pnpm-lock.yaml" }}
           paths:
-            - ~/.cache/yarn
+            - ~/.pnpm-store
 
       - store_artifacts:
           path: package.json
@@ -51,7 +94,9 @@ jobs:
           name: Build packages
           command: |
             set +e
-            NODE_ENV=production yarn run build --concurrency 2
+            NODE_ENV=production
+            pnpm run build --concurrency 2
+            pnpm run sense --concurrency 2
       - persist_to_workspace:
           root: ~/dist-flow-charts
           paths:
@@ -61,7 +106,7 @@ jobs:
     executor: docker-node
     steps:
       - use_workspace
-      - run: npm run lint
+      - run: pnpm run lint
 
   test-unit:
     executor: docker-node
@@ -72,7 +117,7 @@ jobs:
           name: Run unit tests and publish to codeclimate
           command: |
             ./test/cc-bin/cc-test-reporter before-build
-            yarn test:unit --ci --runInBand --reporters=default --reporters=jest-junit --coverage
+            pnpm test:unit --ci --runInBand --reporters=default --reporters=jest-junit --coverage
             ./test/cc-bin/cc-test-reporter after-build --coverage-input-type lcov --exit-code $?
           environment:
             JEST_JUNIT_OUTPUT_DIR: ./reports/junit/
@@ -82,17 +127,19 @@ jobs:
           path: ./reports/junit
       - store_artifacts:
           path: coverage
-  
+
   test-rendering:
     executor: browser-node
     steps:
-      - use_workspace
-      - run: MOCHA_FILE=test-results/rendering/test.xml npm run test:rendering:ci
-      - store_test_results:
-          path: test-results
-      - store_artifacts:
-          path: ./test/rendering/__artifacts__
-  
+      - run_playwright:
+          command: rendering
+
+  test-integration:
+    executor: browser-node
+    steps:
+      - run_playwright:
+          command: integration
+
   publish-dev:
     executor: docker-node
     steps:
@@ -101,12 +148,12 @@ jobs:
           name: Build extensions
           command: |
             set +e
-            NODE_ENV=production yarn run sense --concurrency 2
+            NODE_ENV=production pnpm run sense --concurrency 2
       - run: mkdir SenseExtensions
       - run: ./scripts/zip-extensions.sh
       - store_artifacts:
           path: ./SenseExtensions
-  
+
   verify-specs:
     executor: docker-node
     steps:
@@ -114,7 +161,7 @@ jobs:
       - run:
           name: Verify that the spec are updated
           command: |
-            yarn run specs
+            pnpm run specs
             git diff --exit-code --stat;
 
   api-governance:
@@ -153,6 +200,7 @@ jobs:
     steps:
       - checkout
       - setup_write_access
+      - install_pnpm
       - run:
           name: Setup git user
           command: |
@@ -178,8 +226,8 @@ jobs:
           paths:
             - ~/.ssh/known_hosts
       - restore_cache:
-          key: v2-yarn-deps-{{ checksum "yarn.lock" }}
-      - run: yarn install --frozen-lockfile
+          key: v1-pnpm-deps-{{ checksum "pnpm-lock.yaml" }}
+      - run: pnpm install --frozen-lockfile
       - run:
           name: Cut version
           command: ./scripts/version.sh
@@ -190,7 +238,7 @@ jobs:
           name: Build packages
           command: |
             set -e
-            NODE_ENV=production yarn run build --concurrency 2
+            NODE_ENV=production pnpm run build --concurrency 2
       - run:
           name: Remove tag trigger
           command: git push origin :refs/tags/$CIRCLE_TAG
@@ -251,6 +299,9 @@ workflows:
       - test-rendering:
           requires:
             - build
+      - test-integration:
+          requires:
+            - build
       - api-governance:
           context: api-compliance
           requires:
@@ -276,6 +327,10 @@ workflows:
           filters: *filter_auto_release
           requires:
             - install_build_auto
+      - test-integration:
+          filters: *filter_auto_release
+          requires:
+            - install_build_auto
       - publish:
           filters: *filter_auto_release
           requires:
@@ -283,3 +338,4 @@ workflows:
             - lint
             - test-unit
             - test-rendering
+            - test-integration

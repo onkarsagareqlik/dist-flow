@@ -16,6 +16,7 @@ import chartStyleUtils from '@qlik/common/extra/chart-style-utils';
 import ObjectUtils from '@qlik/common/extra/object-utils';
 import Color from '@qlik/common/extra/color-cache';
 
+import { getAxisLabelStyle, getAxisTitleStyle } from '@qlik/common/extra/chart-style-component';
 import DataScroller from './boxplot-data-scroller';
 import CubeGenerator from './boxplot-cubes-generator';
 import tooltipRenderer from './boxplot-box-tooltip-renderer';
@@ -589,6 +590,7 @@ const BoxPlot = ChartView.extend('BoxPlot', {
       chartID,
       theme,
       isRtl,
+      flags: this.flags,
     });
 
     let dimAxisSelectionSettings = {};
@@ -769,10 +771,12 @@ const BoxPlot = ChartView.extend('BoxPlot', {
         brushComponents: ['box-marker'],
       },
 
-      brushActions: this._dependentActions.gestures,
+      brushActions: this._dependentActions?.gestures,
 
       // ref-lines
       refLines: layout.refLine && layout.refLine.refLines,
+      axisTitleStyle: getAxisTitleStyle(chartID, theme, layout),
+      axisLabelStyle: getAxisLabelStyle(chartID, theme, layout),
     });
 
     const settings = chartBuilder.getSettings();

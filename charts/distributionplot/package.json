@@ -1,6 +1,6 @@
 {
   "name": "@nebula.js/sn-distributionplot",
-  "version": "0.36.1",
+  "version": "0.40.7",
   "description": "Distributionplot supernova",
   "author": "QlikTech International AB",
   "license": "MIT",
@@ -21,17 +21,21 @@
   "files": [
     "api-specifications",
     "core",
-    "dist"
+    "core/esm",
+    "dist",
+    "sn-distributionplot-ext"
   ],
   "qext": {
     "name": "Distributionplot",
     "icon": "distributionplot"
   },
   "main": "dist/sn-distplot.js",
+  "systemjs": "dist/sn-distplot.systemjs.js",
   "scripts": {
     "build": "nebula build --config ../../nebula.config.js",
     "lint": "eslint src",
     "start": "nebula serve --type distributionplot --config ../../nebula.config.js",
+    "start:mfe": "nebula serve --type distributionplot --config ../../nebula.config.js --mfe",
     "sense": "nebula sense --partial",
     "sense:watch": "node ../../scripts/sense-watch"
   },
@@ -39,12 +43,12 @@
     "@qlik/common": "0.0.1",
     "extend": "3.0.2",
     "hammerjs": "2.0.8",
-    "jquery": "3.6.1",
-    "picasso-plugin-hammer": "1.9.7",
-    "picasso-plugin-q": "1.9.7",
-    "picasso.js": "1.9.7",
-    "qlik-chart-modules": "0.43.0",
-    "qlik-object-conversion": "0.15.0"
+    "jquery": "3.7.1",
+    "picasso-plugin-hammer": "2.2.7",
+    "picasso-plugin-q": "2.2.7",
+    "picasso.js": "2.2.7",
+    "qlik-chart-modules": "0.72.0",
+    "qlik-object-conversion": "0.16.4"
   },
   "peerDependencies": {
     "@nebula.js/stardust": ">=1.4.0"

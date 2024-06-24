@@ -1,7 +1,9 @@
-import { getValue } from 'qlik-chart-modules';
+import { fontResolver as createFontResolver, getValue } from 'qlik-chart-modules';
 import isInteger from '@qlik/common/extra/is-integer';
+import ChartStyleComponent, { getChartFontResolver } from '@qlik/common/extra/chart-style-component';
 import histogramUtils from './histogram-utils';
 import propsLogic from './histogram-properties-logic';
+import getStylingPanelDefinition from './styling-panel-definition';
 
 const maxCountMode = 'maxCount';
 const sizeMode = 'size';
@@ -15,7 +17,10 @@ function showBinCount(data) {
 }
 
 export default function propertyDefinition(env) {
-  const { translator } = env;
+  const { translator, flags } = env;
+
+  const stylingPanelEnabled = env?.flags?.isEnabled('SENSECLIENT_IM_2021_STYLINGPANEL_HISTOGRAM');
+  const bkgOptionsEnabled = env?.flags?.isEnabled('SENSECLIENT_IM_2021_HISTOGRAM_BG');
 
   const measureAxis = {
     uses: 'axis.picasso.measureAxis',
@@ -76,11 +81,14 @@ export default function propertyDefinition(env) {
       },
     },
   };
-
+  const chartID = 'object.histogram';
+  const fontResolver = getChartFontResolver(theme, translator, chartID, createFontResolver, flags);
+  const styleOptions = ChartStyleComponent(fontResolver, theme, chartID);
   const presentation = {
     type: 'items',
     translation: 'properties.presentation',
     items: {
+      stylingPanel: stylingPanelEnabled && getStylingPanelDefinition(bkgOptionsEnabled, styleOptions),
       gridLines: {
         type: 'items',
         snapshot: {
